@@ -4,7 +4,17 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException
 from dotenv import load_dotenv
 
+# Renderデプロイ時は、DATABASE_URLを環境変数から取得する
+# ローカル実行時は .env を読み込む
+from dotenv import load_dotenv
 load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# もしURLが "postgres://" で始まっていたら "postgresql://" に変換する（Renderの仕様対策）
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    
 app = FastAPI()
 
 def get_db_connection():
