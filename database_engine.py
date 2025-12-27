@@ -2,57 +2,100 @@ import sqlite3
 import time
 import random
 
-class DataEngine:
-    def __init__(self, db_name="analysis.db"):
-        self.conn = sqlite3.connect(db_name)
-        self.cursor = self.conn.cursor()
-        self._setup_table()
+# class DataEngine:
+#     def __init__(self, db_name="analysis.db"):
+#         self.conn = sqlite3.connect(db_name)
+#         self.cursor = self.conn.cursor()
+#         self._setup_table()
 
-    def _setup_table(self):
-        """テーブルの作成"""
-        self.cursor.execute("DROP TABLE IF EXISTS sales")
-        self.cursor.execute("""
-            CREATE TABLE sales (
-                id INTEGER PRIMARY KEY,
-                user_id INTEGER,
-                amount REAL,
-                timestamp DATETIME
-            )
-        """)
-        self.conn.commit()
+#     def _setup_table(self):
+#         """テーブルの作成"""
+#         self.cursor.execute("DROP TABLE IF EXISTS sales")
+#         self.cursor.execute("""
+#             CREATE TABLE sales (
+#                 id INTEGER PRIMARY KEY,
+#                 user_id INTEGER,
+#                 amount REAL,
+#                 timestamp DATETIME
+#             )
+#         """)
+#         self.conn.commit()
 
-    def insert_bulk_data(self, n=100000):
-        """10万件のダミーデータを挿入"""
-        print(f"{n}件のデータを挿入中...")
-        data = [(i, random.randint(1, 1000), random.uniform(10, 5000)) for i in range(n)]
-        self.cursor.executemany("INSERT INTO sales (id, user_id, amount) VALUES (?, ?, ?)", data)
-        self.conn.commit()
+#     def insert_bulk_data(self, n=100000):
+#         """10万件のダミーデータを挿入"""
+#         print(f"{n}件のデータを挿入中...")
+#         data = [(i, random.randint(1, 1000), random.uniform(10, 5000)) for i in range(n)]
+#         self.cursor.executemany("INSERT INTO sales (id, user_id, amount) VALUES (?, ?, ?)", data)
+#         self.conn.commit()
 
-    def search_user(self, user_id):
-        """特定のユーザーの購入履歴を検索"""
-        start = time.time()
-        self.cursor.execute("SELECT * FROM sales WHERE user_id = ?", (user_id,))
-        results = self.cursor.fetchall()
-        end = time.time()
-        return end - start, len(results)
+#     def search_user(self, user_id):
+#         """特定のユーザーの購入履歴を検索"""
+#         start = time.time()
+#         self.cursor.execute("SELECT * FROM sales WHERE user_id = ?", (user_id,))
+#         results = self.cursor.fetchall()
+#         end = time.time()
+#         return end - start, len(results)
 
-    def add_index(self):
-        """インデックスを作成"""
-        self.cursor.execute("CREATE INDEX idx_user_id ON sales(user_id)")
-        self.conn.commit()
+#     def add_index(self):
+#         """インデックスを作成"""
+#         self.cursor.execute("CREATE INDEX idx_user_id ON sales(user_id)")
+#         self.conn.commit()
+
+# if __name__ == "__main__":
+#     engine = DataEngine()
+#     engine.insert_bulk_data(100000)
+
+#     # 1. インデックスなしでの検索
+#     t1, count = engine.search_user(500)
+#     print(f"インデックスなしの検索時間: {t1:.6f} 秒 (ヒット数: {count})")
+
+#     # 2. インデックスを追加して検索
+#     print("インデックスを作成中...")
+#     engine.add_index()
+#     t2, count = engine.search_user(500)
+#     print(f"インデックスありの検索時間: {t2:.6f} 秒 (ヒット数: {count})")
+    
+#     print(f"改善率: {t1/t2:.1f} 倍の高速化")
+
+
+
+#postgreSQL
+
+import os
+import psycopg2
+import random
+from dotenv import load_dotenv
+
+load_dotenv()
+
+def insert_sample_data(user_id: int, num_records: int = 50):
+    """
+    指定したユーザーIDに、指定した件数のランダム売上データを挿入する
+    """
+    conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+    cur = conn.cursor()
+    
+    # 挿入するデータの生成（(user_id, amount) のリスト）
+    # ※PostgreSQLは %s をプレースホルダに使います
+    data = [(user_id, random.uniform(1000, 10000)) for _ in range(num_records)]
+    
+    try:
+        # executemany を使うと高速に挿入できます
+        query = "INSERT INTO sales (user_id, amount) VALUES (%s, %s)"
+        cur.executemany(query, data)
+        conn.commit()
+        print(f"✅ ユーザー {user_id} に {num_records} 件のデータを挿入しました。")
+    except Exception as e:
+        conn.rollback()
+        print(f"❌ 挿入エラー: {e}")
+    finally:
+        cur.close()
+        conn.close()
 
 if __name__ == "__main__":
-    engine = DataEngine()
-    engine.insert_bulk_data(100000)
-
-    # 1. インデックスなしでの検索
-    t1, count = engine.search_user(500)
-    print(f"インデックスなしの検索時間: {t1:.6f} 秒 (ヒット数: {count})")
-
-    # 2. インデックスを追加して検索
-    print("インデックスを作成中...")
-    engine.add_index()
-    t2, count = engine.search_user(500)
-    print(f"インデックスありの検索時間: {t2:.6f} 秒 (ヒット数: {count})")
+    # テストで使っている 999 番に 100 件追加してみる
+    insert_sample_data(999, 100)
     
-    print(f"改善率: {t1/t2:.1f} 倍の高速化")
+    # 1番から10番のユーザーにも少しずつ入れてみる
+    for i in range(1, 11):
+        insert_sample_data(i, 30)
